@@ -147,10 +147,6 @@ class gh_mesh_simplify(mesh3D):
 
         self.active_blender_object = active_object
         self.load_from_blender()
-        self.initialization_simplification()
-        self.generate_initial_valid_pairs()
-        self.calculate_optimal_contraction_pairs_and_cost()
-        self.iteratively_remove_least_cost_valid_pairs()
         self.update_blender_mesh()
         print("Done!")
 
