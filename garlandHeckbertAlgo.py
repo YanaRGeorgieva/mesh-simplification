@@ -1,40 +1,59 @@
-import bpy
-import numpy as np
-import sys 
-
-class HalfEdge:
-    def __init__(self, vertex=None, next=None, twin=None, face=None):
-        self.vertex = vertex  # Vertex at the end of this half-edge
-        self.next = next      # Next half-edge around the face
-        self.twin = twin      # Opposite half-edge
-        self.face = face      # Face this half-edge belongs to
-
+import bpy  # Blender Python API for interacting with Blender
+import numpy as np  # Numpy for numerical operations
 
 class Vertex:
-    def __init__(self, position, id=None):
-        self.position = position  # 3D coordinates
-        self.half_edge = None     # One of the outgoing half-edges
-        self.id = id            # Unique id via which we can identify it
+    def __init__(self, position, id):
+        self.position = np.array(position)  # Position of the vertex in 3D space
+        self.Q = np.zeros((4, 4))  # Quadric error matrix initialized to zero
+        self.id = id  # Unique ID for the vertex
 
+class Edge:
+    def __init__(self, v1, v2):
+        self.v1 = v1  # One vertex of the edge
+        self.v2 = v2  # The other vertex of the edge
 
 class Face:
-    def __init__(self):
-        self.half_edge = None     # One of the half-edges bordering this face
+    def __init__(self, vertices):
+        self.vertices = vertices  # List of vertices that make up this face
+        self.update_plane_equation()  # Calculate initial plane equation parameters
+
+    def update_plane_equation(self):
+        """
+        Update the plane equation parameters (a, b, c, d) for the face.
+
+        The plane equation is derived from the face vertices.
+        The normal vector (a, b, c) is normalized to ensure it is a unit vector.
+        """
+        v1, v2, v3 = self.vertices[0].position, self.vertices[1].position, self.vertices[2].position
+        # Compute the normal vector of the plane using the cross product of two edge vectors
+        normal = np.cross(v2 - v1, v3 - v1)
+        norm = np.linalg.norm(normal)  # Compute the length of the normal vector
+
+        if norm == 0:
+            self.is_degenerate = True  # Mark the face as degenerate if the normal length is zero
+            return
+        self.is_degenerate = False
+        normal = normal / norm  # Normalize the normal vector to ensure it is a unit vector
+        d = -np.dot(normal, v1)  # Compute the d parameter of the plane equation using one of the vertices
+        self.plane_equation = np.append(normal, d)  # Store the plane equation parameters as a 4-element array
 
 
 class mesh3D:
-    def __init__(self):
-        self.vertices = []
-        self.to_be_deleted_vertices = []
-        self.half_edges = []
-        self.to_be_deleted_half_edges = []
-        self.faces = []
-        self.to_be_deleted_faces = []
-        self.active_blender_object = None
+    def __init__(self, threshold=0.1, simplify_ratio=0.5):
+        self.vertices = []  # List to store all vertices
+        self.edges = []  # List to store all edges
+        self.faces = []  # List to store all faces
+        self.pairs = set()  # Set to store valid pairs for contraction
+        self.pair_costs = {}  # Dictionary to store costs for valid pairs
+        self.threshold = threshold  # Distance threshold for valid pairs
+        self.simplify_ratio = simplify_ratio  # Ratio to simplify the mesh
+        self.active_blender_object = None  # Reference to the active Blender object
+        self.optimal_positions = {}  # Dictionary to store optimal positions for vertex pairs
+        self.vertex_id_counter = 0  # Counter to assign unique IDs to each vertex
 
     def load_from_blender(self):
         """
-        Load the mesh data from the actively selected Blender object and construct the Half-Edge structure.
+        Load the mesh data from the actively selected Blender object and construct the mesh.
         """
         self.active_blender_object = bpy.context.active_object  # Get the currently selected Blender object
 
@@ -44,100 +63,49 @@ class mesh3D:
         # Access the mesh data from the Blender object
         mesh = self.active_blender_object.data
         vertex_map = {}  # Map to store Vertex objects indexed by their Blender vertex index
-        edge_map = {}  # Map to store Half-Edge objects for twin lookup
 
         # Create Vertex objects for each vertex in the Blender mesh
         for v in mesh.vertices:
-            # Create a Vertex object with the position
-            vertex = Vertex(position=np.array(v.co), id=v.index)
-            # Add the vertex to the list of vertices
-            self.vertices.append(vertex)
-            # Map the Blender vertex index to the Vertex object
-            vertex_map[v.index] = vertex
+            vertex = Vertex(position=np.array(v.co), id=self.vertex_id_counter)  # Create a Vertex object with position and ID
+            self.vertex_id_counter += 1  # Increment the unique ID counter
+            self.vertices.append(vertex)  # Add vertex to the list
+            vertex_map[v.index] = vertex  # Map Blender vertex index to Vertex object
 
         # Ensure the active mesh is triangulated
         bpy.context.view_layer.objects.active = self.active_blender_object
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.quads_convert_to_tris()
+        bpy.ops.mesh.quads_convert_to_tris()  # Convert quads to triangles
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        # Create Face and Half-Edge objects for each triangle in the mesh
+        # Create Face and Edge objects for each triangle in the Blender mesh
         for poly in mesh.polygons:
-            assert len(poly.vertices) == 3, "Mesh is not fully triangulated."
-
-            face = Face()  # Create a Face object
-            self.faces.append(face)  # Add the face to the list of faces
-            prev_half_edge = None  # Previous half-edge in the face loop
-            first_half_edge = None  # First half-edge in the face loop
-
-            # Iterate over the vertices of the triangle to create Half-Edges
-            for i in np.arange(3):
-                v1 = poly.vertices[i]
-                v2 = poly.vertices[(i + 1) % 3]
-                # Get the Vertex object for the current vertex index
-                vertex = vertex_map[v1]
-                # Create a Half-Edge object
-                half_edge = HalfEdge(vertex=vertex, face=face)
-
-                if vertex.half_edge is None:
-                    # Assign this half-edge as an outgoing half-edge of the vertex
-                    vertex.half_edge = half_edge
-
-                if prev_half_edge:
-                    # Link the previous half-edge to the current half-edge
-                    prev_half_edge.next = half_edge
-                else:
-                    first_half_edge = half_edge  # Store the first half-edge of the face loop
-
-                prev_half_edge = half_edge  # Update the previous half-edge to the current half-edge
-                # Add the half-edge to the list of half-edges
-                self.half_edges.append(half_edge)
-
-                # Create or update twin half-edge
-                key = (v1, v2)
-                twin_key = (v2, v1)
-                if twin_key in edge_map:
-                    # Get the existing twin half-edge
-                    twin_half_edge = edge_map[twin_key]
-                    half_edge.twin = twin_half_edge  # Link the current half-edge to its twin
-                    twin_half_edge.twin = half_edge  # Link the twin half-edge to the current half-edge
-                else:
-                    # Store the half-edge for twin lookup
-                    edge_map[key] = half_edge
-
-            # Complete the loop for the face
-            # Link the last half-edge back to the first half-edge
-            prev_half_edge.next = first_half_edge
-            face.half_edge = first_half_edge  # Assign the first half-edge to the face
-
+            face_vertices = [vertex_map[mesh.loops[loop_index].vertex_index] for loop_index in range(poly.loop_start, poly.loop_start + poly.loop_total)]
+            face = Face(face_vertices)  # Create a Face object with the vertices
+            if not face.is_degenerate:
+                self.faces.append(face)  # Add face to the list
+                # Add edges for each face
+                num_vertices = len(face_vertices)
+                for i in range(num_vertices):
+                    v1 = face_vertices[i]
+                    v2 = face_vertices[(i + 1) % num_vertices]
+                    edge = Edge(v1, v2)  # Create an Edge object with two vertices
+                    self.edges.append(edge)  # Add edge to the list
+                    
     def update_blender_mesh(self):
         """
-        Update the Blender mesh with the modified vertices and faces.
+        Update the existing Blender mesh with the simplified vertices and faces.
         """
-        mesh = self.active_blender_object.data  # Access the mesh data from the stored Blender object reference
-
-        # Update vertex positions
-        for i, vertex in enumerate(self.vertices):
-            mesh.vertices[i].co = vertex.position
-
-        # Rebuild the faces based on the half-edge structure
-        new_faces = []
-        for face in self.faces:
-            he = face.half_edge
-            face_indices = []
-            for _ in range(3):
-                face_indices.append(self.vertices.index(he.vertex))
-                he = he.next
-            new_faces.append(tuple(face_indices))
-
-        # Update the mesh data
-        mesh.clear_geometry()
-        mesh.from_pydata([vertex.position for vertex in self.vertices], [], new_faces)
-        mesh.update()
-
-        # Refresh the Blender viewport
-        bpy.context.view_layer.update()
+        mesh = self.active_blender_object.data  # Get the mesh data of the active Blender object
+        
+        # Set the vertices and faces
+        vertices = [vertex.position.tolist() for vertex in self.vertices]  # Get the positions of the simplified vertices
+        faces = [[self.vertices.index(vertex) for vertex in face.vertices] for face in self.faces if len(face.vertices) == 3]  # Get the indices of the simplified faces
+        
+        # Update the mesh in Blender
+        mesh.clear_geometry()  # Clear existing geometry
+        mesh.from_pydata(vertices, [], faces)  # Set new vertices and faces
+        mesh.update()  # Update the mesh data
 
 
 # Quadric error metrics based error (Garland and Heckbert).
