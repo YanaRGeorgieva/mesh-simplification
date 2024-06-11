@@ -181,14 +181,16 @@ class gh_mesh_simplify(mesh3D):
         self.compute_error_quadrics(affected_vertices)
 
     def select_valid_pairs(self):
+        """
+        Select valid pairs of vertices for contraction based on edges and distance threshold.
+        """
         for edge in self.edges:
-            self.pairs.add((edge.v1, edge.v2))
+            self.pairs.add((edge.v1, edge.v2))  # Add all existing edges as valid pairs
 
         for i, v1 in enumerate(self.vertices):
             for j, v2 in enumerate(self.vertices):
-                if i < j and np.linalg.norm(v1.position - v2.position) < self.threshold:
-                    self.pairs.add((v1, v2))
-
+                if i < j and np.linalg.norm(v1.position - v2.position) < self.threshold:  # Check if distance is below the threshold
+                    self.pairs.add((v1, v2))  # Add the pair if valid
 
 simplify = gh_mesh_simplify(0.2, 0.8)
 simplify.simplify_obj()
