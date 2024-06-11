@@ -149,6 +149,37 @@ class gh_mesh_simplify(mesh3D):
         self.load_from_blender()
         self.update_blender_mesh()
         print("Done!")
+    
+    def compute_error_quadrics(self, affected_vertices):
+        """
+        Compute the quadric error matrices for each vertex from the array affected_vertices.
+        
+        Each vertex's quadric matrix is the sum of the outer products of the plane equations 
+        of the faces that include this vertex. This matrix represents the error metric for the vertex.
+        """
+        for v in affected_vertices:
+            Q = np.zeros((4, 4))  # Initialize the quadric error matrix to zero
+            for f in self.faces:
+                if v in f.vertices:  # Check if the vertex is part of the face
+                    p = f.plane_equation  # Get the plane equation parameters for the face
+                    p = p.reshape(4, 1)  # Reshape to a column vector
+                    Q += np.matmul(p, p.T)  # Add the outer product of p to the quadric matrix
+            v.Q = Q  # Assign the computed quadric matrix to the vertex
+
+    def update_error_quadrics(self, new_vertex, affected_vertices):
+        """
+        Update the quadric error matrices for the new vertex and its neighbors.
+        
+        The new vertex's quadric matrix is the sum of the quadric matrices of the contracted vertices.
+        The affected vertices are those connected to the contracted vertices; their quadric matrices 
+        need to be updated based on the new geometry.
+        """
+        # Compute the quadric matrix for the new vertex        
+        self.compute_error_quadrics([new_vertex])
+
+        # Update the quadric matrices for the affected vertices
+        self.compute_error_quadrics(affected_vertices)
+
 
 
 simplify = gh_mesh_simplify(0.2, 0.8)
