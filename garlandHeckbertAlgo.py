@@ -180,6 +180,14 @@ class gh_mesh_simplify(mesh3D):
         # Update the quadric matrices for the affected vertices
         self.compute_error_quadrics(affected_vertices)
 
+    def select_valid_pairs(self):
+        for edge in self.edges:
+            self.pairs.add((edge.v1, edge.v2))
+
+        for i, v1 in enumerate(self.vertices):
+            for j, v2 in enumerate(self.vertices):
+                if i < j and np.linalg.norm(v1.position - v2.position) < self.threshold:
+                    self.pairs.add((v1, v2))
 
 
 simplify = gh_mesh_simplify(0.2, 0.8)
