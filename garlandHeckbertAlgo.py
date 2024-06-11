@@ -39,14 +39,12 @@ class Face:
 
 
 class mesh3D:
-    def __init__(self, threshold=0.1, simplify_ratio=0.5):
+    def __init__(self):
         self.vertices = []  # List to store all vertices
         self.edges = []  # List to store all edges
         self.faces = []  # List to store all faces
         self.pairs = set()  # Set to store valid pairs for contraction
         self.pair_costs = {}  # Dictionary to store costs for valid pairs
-        self.threshold = threshold  # Distance threshold for valid pairs
-        self.simplify_ratio = simplify_ratio  # Ratio to simplify the mesh
         self.active_blender_object = None  # Reference to the active Blender object
         self.optimal_positions = {}  # Dictionary to store optimal positions for vertex pairs
         self.vertex_id_counter = 0  # Counter to assign unique IDs to each vertex
@@ -112,14 +110,14 @@ class mesh3D:
 # Mesh simplification calss
 
 class gh_mesh_simplify(mesh3D):
-    def __init__(self, threshold, simplification_ratio):
+    def __init__(self, threshold=0.1, simplification_ratio=0.5):
         mesh3D.__init__(self)
         if simplification_ratio > 1 or simplification_ratio <= 0:
             sys.exit('Error: simplification ratio should be in (0;1]).')
         if threshold < 0:
             sys.exit('Error: threshold should be non-negative.')
-        self.threshold = threshold
-        self.simplification_ratio = simplification_ratio
+        self.threshold = threshold  # Distance threshold for valid pairs
+        self.simplification_ratio = simplification_ratio  # Ratio to simplify the mesh
         
     def initialization_simplification(self):
         """
