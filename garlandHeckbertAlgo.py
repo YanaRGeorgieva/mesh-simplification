@@ -1,6 +1,6 @@
 import bpy  # Blender Python API for interacting with Blender
 import numpy as np  # Numpy for numerical operations
-
+import sys # Add for error handeling
 class Vertex:
     def __init__(self, position, id):
         self.position = np.array(position)  # Position of the vertex in 3D space
