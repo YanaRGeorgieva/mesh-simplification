@@ -147,6 +147,8 @@ class gh_mesh_simplify(mesh3D):
 
         self.active_blender_object = active_object
         self.load_from_blender()
+        self.compute_error_quadrics(self.vertices)
+        self.simplify()
         self.update_blender_mesh()
         print("Done!")
     
@@ -174,11 +176,8 @@ class gh_mesh_simplify(mesh3D):
         The affected vertices are those connected to the contracted vertices; their quadric matrices 
         need to be updated based on the new geometry.
         """
-        # Compute the quadric matrix for the new vertex        
-        self.compute_error_quadrics([new_vertex])
-
-        # Update the quadric matrices for the affected vertices
-        self.compute_error_quadrics(affected_vertices)
+        # Compute the quadric matrix for the new vertex and update the quadric matrices for the affected vertices
+        self.compute_error_quadrics(affected_vertices.append(new_vertex))
 
     def select_valid_pairs(self):
         """
@@ -191,6 +190,31 @@ class gh_mesh_simplify(mesh3D):
             for j, v2 in enumerate(self.vertices):
                 if i < j and np.linalg.norm(v1.position - v2.position) < self.threshold:  # Check if distance is below the threshold
                     self.pairs.add((v1, v2))  # Add the pair if valid
+
+    def simplify(self):
+        """
+        Simplify the mesh by contracting vertices until the target number of vertices is reached.
+        """
+        target_vertices = int(len(self.vertices) * self.simplify_ratio)  # Calculate the target number of vertices
+        self.select_valid_pairs()  # Select valid pairs based on the threshold and existing edges
+        # Initialize the pair costs
+        self.pair_costs = {pair: self.compute_pair_cost(pair) for pair in self.pairs}
+        while len(self.vertices) > target_vertices and self.pair_costs:
+            # Find the pair with the minimum cost
+            v1, v2 = min(self.pair_costs, key=self.pair_costs.get)
+            new_position = self.optimal_positions[(v1, v2)]  # Retrieve the precomputed optimal position
+            new_vertex = Vertex(new_position, self.vertex_id_counter)  # Create a new vertex with a unique ID
+            self.vertex_id_counter += 1
+
+            affected_vertices = set()
+            for edge in self.edges:
+                if edge.v1 in [v1, v2]:
+                    affected_vertices.add(edge.v2)
+                if edge.v2 in [v1, v2]:
+                    affected_vertices.add(edge.v1)
+            affected_vertices = list(affected_vertices)
+
+            self.update_error_quadrics(new_vertex, affected_vertices + [new_vertex])  # Update the Q matrices for the new vertex and its neighbors
 
 simplify = gh_mesh_simplify(0.2, 0.8)
 simplify.simplify_obj()
