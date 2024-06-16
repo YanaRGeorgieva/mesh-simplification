@@ -80,6 +80,14 @@ class Mesh3D:
         # Map to store Vertex objects indexed by their Blender vertex index
         vertex_map = {}
 
+        # Ensure the active mesh is triangulated
+        bpy.context.view_layer.objects.active = self.active_blender_object
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.quads_convert_to_tris()  # Convert quads to triangles
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+
         # Create Vertex objects for each vertex in the Blender mesh
         for v in mesh.vertices:
             # Create a Vertex object with position and ID
@@ -91,12 +99,6 @@ class Mesh3D:
             # Map Blender vertex index to Vertex object
             vertex_map[v.index] = vertex
 
-        # Ensure the active mesh is triangulated
-        bpy.context.view_layer.objects.active = self.active_blender_object
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.quads_convert_to_tris()  # Convert quads to triangles
-        bpy.ops.object.mode_set(mode='OBJECT')
 
         # Create Face and Edge objects for each triangle in the Blender mesh
         for poly in mesh.polygons:
@@ -125,7 +127,8 @@ class Mesh3D:
         # Get the positions of the simplified vertices
         vertices = [vertex.position.tolist() for vertex in self.vertices]
         # Get the indices of the simplified faces
-        faces = [[self.vertices.index(vertex) for vertex in face.vertices] for face in self.faces if not face.is_degenerate]
+        self.faces = [face for face in self.faces if not face.is_degenerate]
+        faces = [[self.vertices.index(vertex) for vertex in face.vertices] for face in self.faces]
 
         # Update the mesh in Blender
         # Clear existing geometry
@@ -172,6 +175,7 @@ class GHMeshSimplify(Mesh3D):
         # Initialize the quadric error matrix to zero
         Q = np.zeros((4, 4))
         for f in v.faces:
+            assert(len(v.faces) < 10)
             if not f.is_degenerate:
                 # Get the plane equation parameters for the face
                 p = f.plane_equation
@@ -235,23 +239,24 @@ class GHMeshSimplify(Mesh3D):
         If Q is not invertible, alternative methods are used to find the optimal position.
         """
         v1, v2 = pair
-        # assert(v1.id < v2.id)
+        assert(v1.id < v2.id)
         # Sum the quadric matrices of the pair
         Q = v1.Q + v2.Q
         # Modify the last row for homogeneous coordinates
         Q[3, :] = [0, 0, 0, 1]
         if np.linalg.det(Q) > 0:
             # Solve Qv = [0, 0, 0, 1]
-            v = np.matmul(np.linalg.inv(Q), np.array([0,0,0,1]).reshape(4, 1))
+            v = np.matmul(np.linalg.inv(Q), np.array([0, 0, 0, 1]).reshape(4, 1))
             # Extract the optimal position
             # Compute the cost of a given position based on the quadric matrix Q.
             min_cost = np.matmul(np.matmul(v.T, Q), v).item()
             v_optimal = v.reshape(4)[:3]
         else:
             min_cost = float('inf')
-            t_values = np.linspace(0, 1, 3)
-            for t in t_values:
-                pos = (1 - t) * v1.position + t * v2.position
+            t_values = np.linspace(0, 1, 10)
+            positions = [v1.position, v2.position, (v1.position + v2.position) /2] + \
+                [(1 - t) * v1.position + t * v2.position for t in t_values]
+            for pos in positions:
                 pos = np.append(pos, 1).reshape(4, 1)
                 cost = np.matmul(np.matmul(pos.T, Q), pos).item()
                 if cost < min_cost:
@@ -263,76 +268,72 @@ class GHMeshSimplify(Mesh3D):
         return min_cost
 
     def simplify(self):
-        """
-        Simplify the mesh by contracting vertices until the target number of vertices is reached.
-        """
-        # Calculate the initial number of vertices
         initial_number_vertices = len(self.vertices)
-        # Calculate the target number of vertices
         target_number_vertices = int(initial_number_vertices * self.simplification_ratio)
-        # Calculate the number of vertices to be removed
         removed_number_vertices = initial_number_vertices - target_number_vertices
 
-        # Select valid pairs based on the threshold and existing edges
         self.select_valid_pairs()
 
-        # Initialize the pair costs
         with ThreadPoolExecutor() as executor:
             pair_costs = executor.map(lambda pair: (pair, self.compute_pair_cost(pair)), self.pairs)
             self.pair_costs = {pair: cost for pair, cost in pair_costs}
 
-        # Counter for progress reports
         currently_removed_number_vertices = 0
 
         while initial_number_vertices - currently_removed_number_vertices > target_number_vertices and self.pair_costs:
-            # Find the pair with the minimum cost
             v1, v2 = min(self.pair_costs, key=self.pair_costs.get)
             min_cost = self.pair_costs[(v1, v2)]
-            # Retrieve the precomputed optimal position
             new_position = self.optimal_positions[(v1, v2)]
 
             for pair in list(self.pair_costs.keys()):
                 if v1 in pair or v2 in pair:
                     del self.pair_costs[pair]
 
-            # Set v1 and v2 with the new position
             v1.position = new_position
             v2.position = new_position  
-            
-            # Find affected vertices, faces and edges
+
             new_pairs = set()
+            remove_faces = set()
             for face in v1.faces:
-                if not face.is_degenerate:
-                    for i, v in enumerate(face.vertices):
-                        if v == v2 or v == v1:
-                            face.vertices[i] = v1
-                    face.update_plane_equation()
-            
-            for face in v2.faces:
-                if not face.is_degenerate:
-                    for i, v in enumerate(face.vertices):
-                        if v == v2 or v == v1:
-                            face.vertices[i] = v1
-                    face.update_plane_equation()
-                    v1.faces.add(face)
-            
-            for face in list(v1.faces):
+                for i, v in enumerate(face.vertices):
+                    if v == v2 or v == v1:
+                        face.vertices[i] = v1
+                face.update_plane_equation()
                 if face.is_degenerate:
-                    v1.faces.remove(face)
-                else:
-                    num = len(face.vertices)
-                    for i, v in enumerate(face.vertices):
-                        v3 = face.vertices[(i + 1) % num]
-                        if v != v3 and v == v1 or v3 == v1:
-                            new_pairs.add(tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
-                    
+                    remove_faces.add(face)
+                        
+            add_faces = set()
+            for face in v2.faces:
+                for i, v in enumerate(face.vertices):
+                    if v == v2 or v == v1:
+                        face.vertices[i] = v1
+                face.update_plane_equation()
+                if not face.is_degenerate:
+                    add_faces.add(face)
+                        
+            for f in remove_faces:
+                v1.faces.remove(f)
+                
+            for f in add_faces:
+                v1.faces.add(f)    
+
+            for face in v1.faces:
+                num = len(face.vertices)
+                for i, v in enumerate(face.vertices):
+                    v3 = face.vertices[(i + 1) % num]
+                    if v != v3 and (v == v1 or v3 == v1):
+                        if not np.allclose(v.position, v3.position):
+                            for f in remove_faces:
+                                if v not in f.vertices and v3 not in f.vertices:
+                                    new_pairs.add(tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
+
             v1.Q += v2.Q
-                       
+                    
             for pair in new_pairs:
                 self.pair_costs[pair] = self.compute_pair_cost(pair)
-                    
+
             self.vertices.remove(v2)
-                
+
             if currently_removed_number_vertices % 100 == 0:
                 percentage = 100 * currently_removed_number_vertices / removed_number_vertices
                 remaining_vertices_until_done = removed_number_vertices - currently_removed_number_vertices
@@ -340,6 +341,7 @@ class GHMeshSimplify(Mesh3D):
             currently_removed_number_vertices += 1
 
 
+
 # Example usage:
-simplify = GHMeshSimplify(0, 0.9)
+simplify = GHMeshSimplify(0, 0.5)
 simplify.simplify_obj()
