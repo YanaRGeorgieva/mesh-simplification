@@ -14,7 +14,6 @@ class Vertex:
         self.id = id
         # List to store references to faces this vertex is part of
         self.faces = set()
-        self.valid_pairs = set()
         
 
 class Face:
@@ -115,7 +114,7 @@ class Mesh3D:
                     # Add the face to the vertex's list of faces
                     vertex.faces.add(face)
 
-        print("Uploading of the mesh is done!")
+        # print("Uploading of the mesh is done!")
 
     def update_blender_mesh(self):
         """
@@ -127,8 +126,7 @@ class Mesh3D:
         # Get the positions of the simplified vertices
         vertices = [vertex.position.tolist() for vertex in self.vertices]
         # Get the indices of the simplified faces
-        self.faces = [face for face in self.faces if not face.is_degenerate]
-        faces = [[self.vertices.index(vertex) for vertex in face.vertices] for face in self.faces]
+        faces = [[self.vertices.index(vertex) for vertex in face.vertices] for face in self.faces if not face.is_degenerate]
 
         # Update the mesh in Blender
         # Clear existing geometry
@@ -137,7 +135,7 @@ class Mesh3D:
         mesh.from_pydata(vertices, [], faces)
         # Update the mesh data
         mesh.update()
-        print("Updating of the mesh is done!")
+        # print("Updating of the mesh is done!")
 
 
 # Quadric error metrics based error (Garland and Heckbert).
@@ -175,7 +173,6 @@ class GHMeshSimplify(Mesh3D):
         # Initialize the quadric error matrix to zero
         Q = np.zeros((4, 4))
         for f in v.faces:
-            assert(len(v.faces) < 10)
             if not f.is_degenerate:
                 # Get the plane equation parameters for the face
                 p = f.plane_equation
@@ -183,8 +180,11 @@ class GHMeshSimplify(Mesh3D):
                 p = p.reshape(1, len(p))
                 # Add the outer product of p to the quadric matrix
                 Q += np.matmul(p.T, p)
+                # print("plane: ", p)
         # Assign the computed quadric matrix to the vertex
         v.Q = Q
+        # print("vertex,",v.id)
+        # print("Q: ", Q)
         
     def initial_compute_error_quadrics(self):
         """
@@ -195,6 +195,8 @@ class GHMeshSimplify(Mesh3D):
         """            
         with ThreadPoolExecutor() as executor:
             executor.map(self.compute_vertex_Q, self.vertices)
+        # for v in self.vertices:
+        #     self.compute_vertex_Q(v)
 
     def select_valid_pairs(self):
         """
@@ -243,14 +245,15 @@ class GHMeshSimplify(Mesh3D):
         # Sum the quadric matrices of the pair
         Q = v1.Q + v2.Q
         # Modify the last row for homogeneous coordinates
-        Q[3, :] = [0, 0, 0, 1]
+        Q_new=np.concatenate([Q[:3,:], np.array([0,0,0,1]).reshape(1,4)], axis=0)
         if np.linalg.det(Q) > 0:
             # Solve Qv = [0, 0, 0, 1]
-            v = np.matmul(np.linalg.inv(Q), np.array([0, 0, 0, 1]).reshape(4, 1))
+            vvvvv = np.matmul(np.linalg.inv(Q_new), np.array([0, 0, 0, 1]).reshape(4, 1))
             # Extract the optimal position
             # Compute the cost of a given position based on the quadric matrix Q.
-            min_cost = np.matmul(np.matmul(v.T, Q), v).item()
-            v_optimal = v.reshape(4)[:3]
+            # print("iterm:", np.matmul(vvvvv.T, Q))
+            min_cost = np.matmul(np.matmul(vvvvv.T, Q), vvvvv)
+            v_optimal = vvvvv.reshape(4)[:3]
         else:
             min_cost = float('inf')
             t_values = np.linspace(0, 1, 10)
@@ -258,13 +261,16 @@ class GHMeshSimplify(Mesh3D):
                 [(1 - t) * v1.position + t * v2.position for t in t_values]
             for pos in positions:
                 pos = np.append(pos, 1).reshape(4, 1)
-                cost = np.matmul(np.matmul(pos.T, Q), pos).item()
+                cost = np.matmul(np.matmul(pos.T, Q), pos)
                 if cost < min_cost:
                     min_cost = cost
                     v_optimal = pos.reshape(4)[:3]
         # Store the optimal position in the dictionary
         self.optimal_positions[pair] = v_optimal
         # Compute the cost of the optimal position
+        # print("matrix", Q)
+        # print("points", v1.position, " ", v2.position)
+        # print("cost", v_optimal, " ",min_cost)
         return min_cost
 
     def simplify(self):
@@ -278,56 +284,40 @@ class GHMeshSimplify(Mesh3D):
             pair_costs = executor.map(lambda pair: (pair, self.compute_pair_cost(pair)), self.pairs)
             self.pair_costs = {pair: cost for pair, cost in pair_costs}
 
+        # for pair in self.pairs:
+        #     self.pair_costs[pair] = self.compute_pair_cost(pair)
         currently_removed_number_vertices = 0
 
         while initial_number_vertices - currently_removed_number_vertices > target_number_vertices and self.pair_costs:
             v1, v2 = min(self.pair_costs, key=self.pair_costs.get)
-            min_cost = self.pair_costs[(v1, v2)]
             new_position = self.optimal_positions[(v1, v2)]
 
             for pair in list(self.pair_costs.keys()):
-                if v1 in pair or v2 in pair:
+                if v2 in pair:
                     del self.pair_costs[pair]
 
             v1.position = new_position
-            v2.position = new_position  
 
+            v1.faces.update(v2.faces)
+            
             new_pairs = set()
-            remove_faces = set()
-            for face in v1.faces:
-                for i, v in enumerate(face.vertices):
-                    if v == v2 or v == v1:
-                        face.vertices[i] = v1
-                face.update_plane_equation()
-                if face.is_degenerate:
-                    remove_faces.add(face)
-                        
-            add_faces = set()
-            for face in v2.faces:
-                for i, v in enumerate(face.vertices):
-                    if v == v2 or v == v1:
-                        face.vertices[i] = v1
-                face.update_plane_equation()
+            for face in list(v1.faces):
                 if not face.is_degenerate:
-                    add_faces.add(face)
+                    for i, v in enumerate(face.vertices):
+                        if v == v2:
+                            face.vertices[i] = v1
+                    face.update_plane_equation()
+                    if face.is_degenerate:
+                        v1.faces.remove(face)
+                        continue
+                    else:
+                        num = len(face.vertices)
+                        for i, v in enumerate(face.vertices):
+                            v3 = face.vertices[(i + 1) % num]
+                            if v != v3 and (v == v1 or v3 == v1):
+                                new_pairs.add(tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
                         
-            for f in remove_faces:
-                v1.faces.remove(f)
-                
-            for f in add_faces:
-                v1.faces.add(f)    
-
-            for face in v1.faces:
-                num = len(face.vertices)
-                for i, v in enumerate(face.vertices):
-                    v3 = face.vertices[(i + 1) % num]
-                    if v != v3 and (v == v1 or v3 == v1):
-                        if not np.allclose(v.position, v3.position):
-                            for f in remove_faces:
-                                if v not in f.vertices and v3 not in f.vertices:
-                                    new_pairs.add(tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
-
-            v1.Q += v2.Q
+            self.compute_vertex_Q(v1)
                     
             for pair in new_pairs:
                 self.pair_costs[pair] = self.compute_pair_cost(pair)
@@ -340,6 +330,53 @@ class GHMeshSimplify(Mesh3D):
                 print(f"{percentage:.2f}% done with {remaining_vertices_until_done} vertices remaining to be removed.")
             currently_removed_number_vertices += 1
 
+    def load_obj_file(self):
+        """
+        Load a 3D model from an OBJ file. Parses vertices and faces.
+        """
+        self.vertices = []
+        self.faces = []
+        vertex_map = {}  # Map from vertex index to Vertex object
+
+        with open("D:\\Math-Concepts-For-Devs\\00.Project\\models\\dinosaur.obj", 'r') as file:
+            for line in file:
+                if line.startswith("v "):
+                    # Parse vertex coordinates
+                    parts = line.split()
+                    position = np.array([float(parts[1]), float(parts[2]), float(parts[3])])
+                    vertex = Vertex(position, self.vertex_id_counter)
+                    self.vertices.append(vertex)
+                    vertex_map[len(self.vertices)] = vertex  # OBJ indices are 1-based
+                    self.vertex_id_counter += 1
+                elif line.startswith("f "):
+                    # Parse face indices
+                    parts = line.split()
+                    vertex_indices = [int(parts[1]), int(parts[2]), int(parts[3])]
+                    face_vertices = [vertex_map[idx] for idx in vertex_indices]
+                    face = Face(face_vertices, self.face_id_counter)
+                    self.face_id_counter += 1
+                    self.faces.append(face)
+                    for vertex in face_vertices:
+                        vertex.faces.add(face)
+
+        # print("Loaded OBJ file from:", "D:\\Math-Concepts-For-Devs\\00.Project\\models\\dinosaur.obj")
+
+    def output(self):
+        """
+        Output the simplified mesh to an OBJ file.
+        """
+        with open("D:\\Math-Concepts-For-Devs\\00.Project\\models\\dinosaurSimp.obj", 'w') as file:
+            # Write vertices
+            for vertex in self.vertices:
+                file.write(f"v {vertex.position[0]} {vertex.position[1]} {vertex.position[2]}\n")
+
+            # Write faces
+            for face in self.faces:
+                if not face.is_degenerate:
+                    vertex_indices = [self.vertices.index(vertex) + 1 for vertex in face.vertices]  # OBJ indices are 1-based
+                    file.write(f"f {vertex_indices[0]} {vertex_indices[1]} {vertex_indices[2]}\n")
+
+        # print("Output simplified model to:", "D:\\Math-Concepts-For-Devs\\00.Project\\models\\dinosaurSimp.obj")
 
 
 # Example usage:
