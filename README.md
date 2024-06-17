@@ -1,4 +1,4 @@
-### Module 1: Math for Developers project
+# Module 1: Math for Developers project
 **Project Focus:** Implementing a basic mesh simplification algorithm
 
 **Project Description:**
