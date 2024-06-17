@@ -26,5 +26,4 @@ python 3.11, numpy, scipy, fake-bpy-module, concurrent.futures.
 
 3. There is a third option involving the `load_obj_file` and `output` methods for *.obj files. In this case you can run the program in a terminal (I am sorry but for now you have to hardcode the paths to the files).
 
-<img src="images/trexFull.png" alt="Tyrannosaurus no simplification" width="45%">
-<img src="images/trex90P.png" alt="Tyrannosaurus 90% simplification" width="45%">
+<img src="images/trexFull.png" alt="Tyrannosaurus no simplification" width="45%"> <img src="images/trex90P.png" alt="Tyrannosaurus 90% simplification" width="45%">
