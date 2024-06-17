@@ -341,6 +341,8 @@ class GHMeshSimplify(Mesh3D):
                 remaining_vertices_until_done = removed_number_vertices - currently_removed_number_vertices
                 print(f"{percentage:.2f}% done with {remaining_vertices_until_done} vertices remaining to be removed.")
             currently_removed_number_vertices += 1
+            
+        print(f"100.00% done with 0 vertices remaining to be removed.")
 
     def load_obj_file(self, input_file):
         """
@@ -392,5 +394,5 @@ class GHMeshSimplify(Mesh3D):
 
 
 # Example usage:
-simplify = GHMeshSimplify(0.5, 0.8)
+simplify = GHMeshSimplify(0, 0.8)
 simplify.simplify_obj()
