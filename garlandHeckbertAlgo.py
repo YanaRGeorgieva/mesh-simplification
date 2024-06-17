@@ -394,5 +394,5 @@ class GHMeshSimplify(Mesh3D):
 
 
 # Example usage:
-simplify = GHMeshSimplify(0, 0.8)
+simplify = GHMeshSimplify(0, 0.2)
 simplify.simplify_obj()
