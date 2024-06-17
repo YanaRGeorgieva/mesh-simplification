@@ -6,21 +6,21 @@ from concurrent.futures import ThreadPoolExecutor  # For multithreading
 
 class Vertex:
     def __init__(self, position, id):
-        # Position of the vertex in 3D space
+        # Initialize the position of the vertex in 3D space
         self.position = np.array(position)
-        # Quadric error matrix initialized to zero
+        # Initialize the quadric error matrix to zero
         self.Q = np.zeros((4, 4))
         # Unique ID for the vertex
         self.id = id
-        # List to store references to faces this vertex is part of
+        # Set to store references to faces this vertex is part of
         self.faces = set()
         
 
 class Face:
     def __init__(self, vertices, id):
-         # Unique ID for the face
+        # Unique ID for the face
         self.id = id
-        # List of edges that make up this face
+        # List of vertices that make up this face
         self.vertices = vertices
         # Calculate initial plane equation parameters
         self.update_plane_equation()
@@ -35,15 +35,20 @@ class Face:
         v1, v2, v3 = self.vertices[0].position, self.vertices[1].position, self.vertices[2].position
         # Compute the normal vector of the plane using the cross product of two edge vectors
         normal = np.cross(v2 - v1, v3 - v1)
-        norm = np.linalg.norm(normal)  # Compute the length of the normal vector
+        # Compute the length of the normal vector
+        norm = np.linalg.norm(normal) 
         
         if norm == 0:
-            self.is_degenerate = True  # Mark the face as degenerate if the normal length is zero
+            # Mark the face as degenerate if the normal length is zero
+            self.is_degenerate = True
             return
         self.is_degenerate = False
-        normal = normal / norm  # Normalize the normal vector to ensure it is a unit vector
-        d = -np.dot(normal, v1)  # Compute the d parameter of the plane equation using one of the vertices
-        self.plane_equation = np.append(normal, d)  # Store the plane equation parameters as a 4-element array
+        # Normalize the normal vector to ensure it is a unit vector
+        normal = normal / norm
+        # Compute the d parameter of the plane equation using one of the vertices
+        d = -np.dot(normal, v1)
+        # Store the plane equation parameters as a 4-element array
+        self.plane_equation = np.append(normal, d)
 
 class Mesh3D:
     def __init__(self):
@@ -86,7 +91,6 @@ class Mesh3D:
         bpy.ops.mesh.quads_convert_to_tris()  # Convert quads to triangles
         bpy.ops.object.mode_set(mode='OBJECT')
 
-
         # Create Vertex objects for each vertex in the Blender mesh
         for v in mesh.vertices:
             # Create a Vertex object with position and ID
@@ -98,9 +102,9 @@ class Mesh3D:
             # Map Blender vertex index to Vertex object
             vertex_map[v.index] = vertex
 
-
-        # Create Face and Edge objects for each triangle in the Blender mesh
+        # Create Face objects for each triangle in the Blender mesh
         for poly in mesh.polygons:
+            # Get vertices for the face
             face_vertices = [vertex_map[mesh.loops[loop_index].vertex_index]
                              for loop_index in range(poly.loop_start, poly.loop_start + poly.loop_total)]
             # Create a Face object with the vertices
@@ -114,19 +118,21 @@ class Mesh3D:
                     # Add the face to the vertex's list of faces
                     vertex.faces.add(face)
 
-        # print("Uploading of the mesh is done!")
+        print("Uploading of the mesh is done!")
 
     def update_blender_mesh(self):
         """
         Update the existing Blender mesh with the simplified vertices and faces.
         """
-        mesh = self.active_blender_object.data  # Get the mesh data of the active Blender object
+        # Get the mesh data of the active Blender object
+        mesh = self.active_blender_object.data
 
-        # Set the vertices and faces
+        # Clean the list of the deleted vertices
+        vertices_obj = [vertex for vertex in self.vertices if vertex.id != -1]
         # Get the positions of the simplified vertices
-        vertices = [vertex.position.tolist() for vertex in self.vertices]
+        vertices = [vertex.position.tolist() for vertex in self.vertices if vertex.id != -1]
         # Get the indices of the simplified faces
-        faces = [[self.vertices.index(vertex) for vertex in face.vertices] for face in self.faces if not face.is_degenerate]
+        faces = [[vertices_obj.index(vertex) for vertex in face.vertices] for face in self.faces if not face.is_degenerate]
 
         # Update the mesh in Blender
         # Clear existing geometry
@@ -135,14 +141,11 @@ class Mesh3D:
         mesh.from_pydata(vertices, [], faces)
         # Update the mesh data
         mesh.update()
-        # print("Updating of the mesh is done!")
+        print("Updating of the mesh is done!")
 
-
-# Quadric error metrics based error (Garland and Heckbert).
-# Mesh simplification calss
 class GHMeshSimplify(Mesh3D):
     def __init__(self, threshold=0.1, simplification_ratio=0.5):
-        Mesh3D.__init__(self)
+        super().__init__()
         if simplification_ratio > 1 or simplification_ratio <= 0:
             sys.exit('Error: simplification ratio should be in (0;1]).')
         if threshold < 0:
@@ -152,12 +155,16 @@ class GHMeshSimplify(Mesh3D):
         # Ratio to simplify the mesh
         self.simplification_ratio = simplification_ratio
 
-    # Function to load an OBJ file into Blender
     def load_obj(self, filepath):
+        """
+        Load an OBJ file into Blender.
+        """
         bpy.ops.wm.obj_import(filepath=filepath)
 
-    # Function to run the simplification process
     def simplify_obj(self):
+        """
+        Run the simplification process.
+        """
         active_object = bpy.context.active_object
         if active_object is None or active_object.type != 'MESH':
             raise ValueError("No active mesh object selected in Blender.")
@@ -169,9 +176,13 @@ class GHMeshSimplify(Mesh3D):
         self.update_blender_mesh()
         print("Done!")
 
-    def compute_vertex_Q(self, v):    
-        # Initialize the quadric error matrix to zero
-        Q = np.zeros((4, 4))
+    def compute_vertex_Q(self, v):
+        """
+        Compute the initial quadric error matrix for a vertex.
+        Each vertex's quadric matrix is the sum of the outer products of the plane equations 
+        of the faces that include this vertex. This matrix represents the error metric for the vertex.
+        """
+        Q = np.zeros((4, 4))  # Initialize the quadric error matrix to zero
         for f in v.faces:
             if not f.is_degenerate:
                 # Get the plane equation parameters for the face
@@ -180,23 +191,15 @@ class GHMeshSimplify(Mesh3D):
                 p = p.reshape(1, len(p))
                 # Add the outer product of p to the quadric matrix
                 Q += np.matmul(p.T, p)
-                # print("plane: ", p)
         # Assign the computed quadric matrix to the vertex
         v.Q = Q
-        # print("vertex,",v.id)
-        # print("Q: ", Q)
         
     def initial_compute_error_quadrics(self):
         """
         Compute the initial (multithreaded) quadric error matrices for each vertex.
-
-        Each vertex's quadric matrix is the sum of the outer products of the plane equations 
-        of the faces that include this vertex. This matrix represents the error metric for the vertex.
-        """            
+        """
         with ThreadPoolExecutor() as executor:
             executor.map(self.compute_vertex_Q, self.vertices)
-        # for v in self.vertices:
-        #     self.compute_vertex_Q(v)
 
     def select_valid_pairs(self):
         """
@@ -204,11 +207,10 @@ class GHMeshSimplify(Mesh3D):
         """
         # Add all existing edges as valid pairs
         for face in self.faces:
-            if not face.is_degenerate:
-                # Add edges for each face
-               for i, v1 in enumerate(face.vertices):
-                    v2 = face.vertices[(i + 1) % len(face.vertices)]
-                    self.pairs.add(tuple(sorted((v1, v2), key=lambda vertex: vertex.id)))
+            # Add edges for each face
+            for i, v1 in enumerate(face.vertices):
+                v2 = face.vertices[(i + 1) % len(face.vertices)]
+                self.pairs.add(tuple(sorted((v1, v2), key=lambda vertex: vertex.id)))
 
         if self.threshold > 0:
             # Using a KD-tree to optimize the selection of points which satisfy the threshold distance
@@ -245,84 +247,94 @@ class GHMeshSimplify(Mesh3D):
         # Sum the quadric matrices of the pair
         Q = v1.Q + v2.Q
         # Modify the last row for homogeneous coordinates
-        Q_new=np.concatenate([Q[:3,:], np.array([0,0,0,1]).reshape(1,4)], axis=0)
-        if np.linalg.det(Q) > 0:
+        Q_new = np.concatenate([Q[:3,:], np.array([0,0,0,1]).reshape(1,4)], axis=0)
+        if np.linalg.det(Q) > 1e-10:
             # Solve Qv = [0, 0, 0, 1]
-            vvvvv = np.matmul(np.linalg.inv(Q_new), np.array([0, 0, 0, 1]).reshape(4, 1))
+            v = np.matmul(np.linalg.inv(Q_new), np.array([0, 0, 0, 1]).reshape(4, 1))
             # Extract the optimal position
-            # Compute the cost of a given position based on the quadric matrix Q.
-            # print("iterm:", np.matmul(vvvvv.T, Q))
-            min_cost = np.matmul(np.matmul(vvvvv.T, Q), vvvvv)
-            v_optimal = vvvvv.reshape(4)[:3]
+            v_optimal = v.reshape(4)[:3]
+            # Compute the cost of a given position based on the quadric matrix Q
+            min_cost = np.matmul(np.matmul(v.T, Q), v).item()
         else:
             min_cost = float('inf')
+            # Test multiple positions along the edge
             t_values = np.linspace(0, 1, 10)
-            positions = [v1.position, v2.position, (v1.position + v2.position) /2] + \
+            positions = [v1.position, v2.position, (v1.position + v2.position) / 2] + \
                 [(1 - t) * v1.position + t * v2.position for t in t_values]
             for pos in positions:
                 pos = np.append(pos, 1).reshape(4, 1)
-                cost = np.matmul(np.matmul(pos.T, Q), pos)
+                cost = np.matmul(np.matmul(pos.T, Q), pos).item()
                 if cost < min_cost:
                     min_cost = cost
                     v_optimal = pos.reshape(4)[:3]
         # Store the optimal position in the dictionary
         self.optimal_positions[pair] = v_optimal
-        # Compute the cost of the optimal position
-        # print("matrix", Q)
-        # print("points", v1.position, " ", v2.position)
-        # print("cost", v_optimal, " ",min_cost)
         return min_cost
 
     def simplify(self):
+        """
+        Simplify the mesh by contracting vertices until the target number of vertices is reached.
+        """
         initial_number_vertices = len(self.vertices)
         target_number_vertices = int(initial_number_vertices * self.simplification_ratio)
         removed_number_vertices = initial_number_vertices - target_number_vertices
 
+        # Select valid pairs based on the threshold and existing edges
         self.select_valid_pairs()
 
+        # Initialize the pair costs
         with ThreadPoolExecutor() as executor:
             pair_costs = executor.map(lambda pair: (pair, self.compute_pair_cost(pair)), self.pairs)
             self.pair_costs = {pair: cost for pair, cost in pair_costs}
 
-        # for pair in self.pairs:
-        #     self.pair_costs[pair] = self.compute_pair_cost(pair)
         currently_removed_number_vertices = 0
 
         while initial_number_vertices - currently_removed_number_vertices > target_number_vertices and self.pair_costs:
+            # Find the pair with the minimum cost
             v1, v2 = min(self.pair_costs, key=self.pair_costs.get)
             new_position = self.optimal_positions[(v1, v2)]
 
+            # Remove the pairs in the dictionary containing the to be removed vertex v2
             for pair in list(self.pair_costs.keys()):
                 if v2 in pair:
                     del self.pair_costs[pair]
 
+            # Update the position of v1 to the new position
             v1.position = new_position
 
+            # Merge faces of v2 into v1
             v1.faces.update(v2.faces)
             
+            # Update the 
             new_pairs = set()
             for face in list(v1.faces):
-                if not face.is_degenerate:
+                # Rewire all faces containing v2 to involve v1
+                for i, v in enumerate(face.vertices):
+                    if v == v2:
+                        face.vertices[i] = v1
+                # Update the plane equation
+                face.update_plane_equation()
+                # Remove the face if it is degenerate
+                if face.is_degenerate:
+                    v1.faces.remove(face)
+                    continue
+                else:
+                    # Otherwise add all pairs containing v1 to have their cost recomputed
+                    num = len(face.vertices)
                     for i, v in enumerate(face.vertices):
-                        if v == v2:
-                            face.vertices[i] = v1
-                    face.update_plane_equation()
-                    if face.is_degenerate:
-                        v1.faces.remove(face)
-                        continue
-                    else:
-                        num = len(face.vertices)
-                        for i, v in enumerate(face.vertices):
-                            v3 = face.vertices[(i + 1) % num]
-                            if v != v3 and (v == v1 or v3 == v1):
-                                new_pairs.add(tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
-                        
+                        v3 = face.vertices[(i + 1) % num]
+                        if v != v3 and (v == v1 or v3 == v1):
+                            new_pairs.add(tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
+            
+            # Recompute the quadric error matrix for the updated vertex v1
             self.compute_vertex_Q(v1)
-                    
+            
+            # Recompute the cost for all pairs involving v1   
             for pair in new_pairs:
                 self.pair_costs[pair] = self.compute_pair_cost(pair)
 
-            self.vertices.remove(v2)
+            # Mark v2 as removed
+            v2.id = -1
 
             if currently_removed_number_vertices % 100 == 0:
                 percentage = 100 * currently_removed_number_vertices / removed_number_vertices
@@ -330,7 +342,7 @@ class GHMeshSimplify(Mesh3D):
                 print(f"{percentage:.2f}% done with {remaining_vertices_until_done} vertices remaining to be removed.")
             currently_removed_number_vertices += 1
 
-    def load_obj_file(self):
+    def load_obj_file(self, input_file):
         """
         Load a 3D model from an OBJ file. Parses vertices and faces.
         """
@@ -338,7 +350,7 @@ class GHMeshSimplify(Mesh3D):
         self.faces = []
         vertex_map = {}  # Map from vertex index to Vertex object
 
-        with open("D:\\Math-Concepts-For-Devs\\00.Project\\models\\dinosaur.obj", 'r') as file:
+        with open(input_file, 'r') as file:
             for line in file:
                 if line.startswith("v "):
                     # Parse vertex coordinates
@@ -359,13 +371,13 @@ class GHMeshSimplify(Mesh3D):
                     for vertex in face_vertices:
                         vertex.faces.add(face)
 
-        # print("Loaded OBJ file from:", "D:\\Math-Concepts-For-Devs\\00.Project\\models\\dinosaur.obj")
+        print("Loaded OBJ file from:", input_file)
 
-    def output(self):
+    def output(self, output_file):
         """
         Output the simplified mesh to an OBJ file.
         """
-        with open("D:\\Math-Concepts-For-Devs\\00.Project\\models\\dinosaurSimp.obj", 'w') as file:
+        with open(output_file, 'w') as file:
             # Write vertices
             for vertex in self.vertices:
                 file.write(f"v {vertex.position[0]} {vertex.position[1]} {vertex.position[2]}\n")
@@ -376,9 +388,9 @@ class GHMeshSimplify(Mesh3D):
                     vertex_indices = [self.vertices.index(vertex) + 1 for vertex in face.vertices]  # OBJ indices are 1-based
                     file.write(f"f {vertex_indices[0]} {vertex_indices[1]} {vertex_indices[2]}\n")
 
-        # print("Output simplified model to:", "D:\\Math-Concepts-For-Devs\\00.Project\\models\\dinosaurSimp.obj")
+        print("Output simplified model to:", output_file)
 
 
 # Example usage:
-simplify = GHMeshSimplify(0, 0.5)
+simplify = GHMeshSimplify(0.5, 0.8)
 simplify.simplify_obj()
