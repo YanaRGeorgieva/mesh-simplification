@@ -24,6 +24,6 @@ python 3.11, numpy, scipy, fake-bpy-module, concurrent.futures.
     * You can load some meshes and be sure to select one of them to be the active object.
     * Then you run the script via the command palette "Blender: Run Script"
 
-3. There is a third option involving the `load_obj_file` and `output` methods for *.obj files (doesn't support the full format, you can this, e.g., with these models https://github.com/alecjacobson/common-3d-test-models/tree/master). In this case you can run the program in a terminal (I am sorry but for now you have to hardcode the paths to the files).
+3. There is a third option involving the `load_obj_file` and `output` methods for *.obj files (doesn't support the full format, you can this, e.g., with some of these models https://github.com/alecjacobson/common-3d-test-models/tree/master you can run the program). In this case you can run the program in a terminal (I am sorry but for now you have to hardcode the paths to the files).
 
 <img src="images/trexFull.png" alt="Tyrannosaurus no simplification" width="45%"> <img src="images/trex90P.png" alt="Tyrannosaurus 90% simplification" width="45%">
