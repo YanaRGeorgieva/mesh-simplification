@@ -4,6 +4,7 @@ import sys  # Add for error handling
 from scipy.spatial import KDTree  # Efficient nearest neighbor search
 from concurrent.futures import ThreadPoolExecutor  # For multithreading
 
+
 class Vertex:
     def __init__(self, position, id):
         # Initialize the position of the vertex in 3D space
@@ -14,7 +15,7 @@ class Vertex:
         self.id = id
         # Set to store references to faces this vertex is part of
         self.faces = set()
-        
+
 
 class Face:
     def __init__(self, vertices, id):
@@ -36,8 +37,8 @@ class Face:
         # Compute the normal vector of the plane using the cross product of two edge vectors
         normal = np.cross(v2 - v1, v3 - v1)
         # Compute the length of the normal vector
-        norm = np.linalg.norm(normal) 
-        
+        norm = np.linalg.norm(normal)
+
         if norm == 0:
             # Mark the face as degenerate if the normal length is zero
             self.is_degenerate = True
@@ -49,6 +50,7 @@ class Face:
         d = -np.dot(normal, v1)
         # Store the plane equation parameters as a 4-element array
         self.plane_equation = np.append(normal, d)
+
 
 class Mesh3D:
     def __init__(self):
@@ -130,9 +132,10 @@ class Mesh3D:
         # Clean the list of the deleted vertices
         vertices_obj = [vertex for vertex in self.vertices if vertex.id != -1]
         # Get the positions of the simplified vertices
-        vertices = [vertex.position.tolist() for vertex in self.vertices if vertex.id != -1]
+        vertices = [vertex.position.tolist() for vertex in vertices_obj]
         # Get the indices of the simplified faces
-        faces = [[vertices_obj.index(vertex) for vertex in face.vertices] for face in self.faces if not face.is_degenerate]
+        faces = [[vertices_obj.index(vertex) for vertex in face.vertices]
+                 for face in self.faces if not face.is_degenerate]
 
         # Update the mesh in Blender
         # Clear existing geometry
@@ -142,6 +145,7 @@ class Mesh3D:
         # Update the mesh data
         mesh.update()
         print("Updating of the mesh is done!")
+
 
 class GHMeshSimplify(Mesh3D):
     def __init__(self, threshold=0.1, simplification_ratio=0.5):
@@ -161,7 +165,7 @@ class GHMeshSimplify(Mesh3D):
         """
         bpy.ops.wm.obj_import(filepath=filepath)
 
-    def simplify_obj(self):
+    def simplify_obj_from_blender(self):
         """
         Run the simplification process.
         """
@@ -174,6 +178,16 @@ class GHMeshSimplify(Mesh3D):
         self.initial_compute_error_quadrics()
         self.simplify()
         self.update_blender_mesh()
+        print("Done!")
+        
+    def simplify_obj_from_file(self, input_file, output_file):
+        """
+        Run the simplification process.
+        """
+        self.load_obj_file(input_file)
+        self.initial_compute_error_quadrics()
+        self.simplify()
+        self.output(output_file)
         print("Done!")
 
     def compute_vertex_Q(self, v):
@@ -193,7 +207,7 @@ class GHMeshSimplify(Mesh3D):
                 Q += np.matmul(p.T, p)
         # Assign the computed quadric matrix to the vertex
         v.Q = Q
-        
+
     def initial_compute_error_quadrics(self):
         """
         Compute the initial (multithreaded) quadric error matrices for each vertex.
@@ -210,13 +224,14 @@ class GHMeshSimplify(Mesh3D):
             # Add edges for each face
             for i, v1 in enumerate(face.vertices):
                 v2 = face.vertices[(i + 1) % len(face.vertices)]
-                self.pairs.add(tuple(sorted((v1, v2), key=lambda vertex: vertex.id)))
+                self.pairs.add(
+                    tuple(sorted((v1, v2), key=lambda vertex: vertex.id)))
 
         if self.threshold > 0:
             # Using a KD-tree to optimize the selection of points which satisfy the threshold distance
             vertex_positions = np.array([v.position for v in self.vertices])
             kdtree = KDTree(vertex_positions)
-            
+
             def check_valid_pairs(i):
                 valid_pairs = set()
                 v1 = self.vertices[i]
@@ -227,9 +242,10 @@ class GHMeshSimplify(Mesh3D):
                         if v1.id < v2.id:
                             valid_pairs.add((v1, v2))
                 return valid_pairs
-            
+
             with ThreadPoolExecutor() as executor:
-                results = executor.map(check_valid_pairs, range(len(self.vertices)))
+                results = executor.map(
+                    check_valid_pairs, range(len(self.vertices)))
                 for result in results:
                     self.pairs.update(result)
         print("Selecting the initial valid to contract pairs is done!")
@@ -243,14 +259,14 @@ class GHMeshSimplify(Mesh3D):
         If Q is not invertible, alternative methods are used to find the optimal position.
         """
         v1, v2 = pair
-        assert(v1.id < v2.id)
+        assert (v1.id < v2.id)
         # Sum the quadric matrices of the pair
         Q = v1.Q + v2.Q
         # Modify the last row for homogeneous coordinates
-        Q_new = np.concatenate([Q[:3,:], np.array([0,0,0,1]).reshape(1,4)], axis=0)
-        if np.linalg.det(Q) > 1e-10:
+        Q_new = np.concatenate([Q[:3, :], np.array([0, 0, 0, 1]).reshape(1, 4)], axis=0)
+        if np.linalg.det(Q_new) > 1e-10:
             # Solve Qv = [0, 0, 0, 1]
-            v = np.matmul(np.linalg.inv(Q_new), np.array([0, 0, 0, 1]).reshape(4, 1))
+            v = np.linalg.solve(Q_new, np.array([0, 0, 0, 1]))
             # Extract the optimal position
             v_optimal = v.reshape(4)[:3]
             # Compute the cost of a given position based on the quadric matrix Q
@@ -298,14 +314,15 @@ class GHMeshSimplify(Mesh3D):
             for pair in list(self.pair_costs.keys()):
                 if v2 in pair:
                     del self.pair_costs[pair]
+                    del self.optimal_positions[pair]
 
             # Update the position of v1 to the new position
             v1.position = new_position
 
             # Merge faces of v2 into v1
             v1.faces.update(v2.faces)
-            
-            # Update the 
+
+            # Update the
             new_pairs = set()
             for face in list(v1.faces):
                 # Rewire all faces containing v2 to involve v1
@@ -324,12 +341,13 @@ class GHMeshSimplify(Mesh3D):
                     for i, v in enumerate(face.vertices):
                         v3 = face.vertices[(i + 1) % num]
                         if v != v3 and (v == v1 or v3 == v1):
-                            new_pairs.add(tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
-            
+                            new_pairs.add(
+                                tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
+
             # Recompute the quadric error matrix for the updated vertex v1
             self.compute_vertex_Q(v1)
-            
-            # Recompute the cost for all pairs involving v1   
+
+            # Recompute the cost for all pairs involving v1
             for pair in new_pairs:
                 self.pair_costs[pair] = self.compute_pair_cost(pair)
 
@@ -338,10 +356,12 @@ class GHMeshSimplify(Mesh3D):
 
             if currently_removed_number_vertices % 100 == 0:
                 percentage = 100 * currently_removed_number_vertices / removed_number_vertices
-                remaining_vertices_until_done = removed_number_vertices - currently_removed_number_vertices
-                print(f"{percentage:.2f}% done with {remaining_vertices_until_done} vertices remaining to be removed.")
+                remaining_vertices_until_done = removed_number_vertices - \
+                    currently_removed_number_vertices
+                print(
+                    f"{percentage:.2f}% done with {remaining_vertices_until_done} vertices remaining to be removed.")
             currently_removed_number_vertices += 1
-            
+
         print(f"100.00% done with 0 vertices remaining to be removed.")
 
     def load_obj_file(self, input_file):
@@ -357,15 +377,18 @@ class GHMeshSimplify(Mesh3D):
                 if line.startswith("v "):
                     # Parse vertex coordinates
                     parts = line.split()
-                    position = np.array([float(parts[1]), float(parts[2]), float(parts[3])])
+                    position = np.array(
+                        [float(parts[1]), float(parts[2]), float(parts[3])])
                     vertex = Vertex(position, self.vertex_id_counter)
                     self.vertices.append(vertex)
-                    vertex_map[len(self.vertices)] = vertex  # OBJ indices are 1-based
+                    # OBJ indices are 1-based
+                    vertex_map[len(self.vertices)] = vertex
                     self.vertex_id_counter += 1
                 elif line.startswith("f "):
                     # Parse face indices
                     parts = line.split()
-                    vertex_indices = [int(parts[1]), int(parts[2]), int(parts[3])]
+                    vertex_indices = [int(parts[1]), int(
+                        parts[2]), int(parts[3])]
                     face_vertices = [vertex_map[idx] for idx in vertex_indices]
                     face = Face(face_vertices, self.face_id_counter)
                     self.face_id_counter += 1
@@ -382,17 +405,22 @@ class GHMeshSimplify(Mesh3D):
         with open(output_file, 'w') as file:
             # Write vertices
             for vertex in self.vertices:
-                file.write(f"v {vertex.position[0]} {vertex.position[1]} {vertex.position[2]}\n")
+                file.write(
+                    f"v {vertex.position[0]} {vertex.position[1]} {vertex.position[2]}\n")
 
             # Write faces
             for face in self.faces:
                 if not face.is_degenerate:
-                    vertex_indices = [self.vertices.index(vertex) + 1 for vertex in face.vertices]  # OBJ indices are 1-based
-                    file.write(f"f {vertex_indices[0]} {vertex_indices[1]} {vertex_indices[2]}\n")
+                    # OBJ indices are 1-based
+                    vertex_indices = [self.vertices.index(
+                        vertex) + 1 for vertex in face.vertices]
+                    file.write(
+                        f"f {vertex_indices[0]} {vertex_indices[1]} {vertex_indices[2]}\n")
 
         print("Output simplified model to:", output_file)
 
 
 # Example usage:
-simplify = GHMeshSimplify(0, 0.2)
-simplify.simplify_obj()
+simplify = GHMeshSimplify(0.1, 0.5)
+# simplify.simplify_obj_from_blender()
+# simplify.simplify_obj_from_file(".....obj", ".....obj")
