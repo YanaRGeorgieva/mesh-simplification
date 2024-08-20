@@ -72,7 +72,7 @@ class Face:
 
 
 class GHMeshSimplify:
-    def __init__(self, threshold=0.1, simplification_ratio=0.5, penalty_weight=1000.0):
+    def __init__(self, threshold=0.1, simplification_ratio=0.5, penalty_weight=2000.0):
         super().__init__()
         if simplification_ratio > 1 or simplification_ratio <= 0:
             sys.exit('Error: simplification ratio should be in (0;1]).')
@@ -345,7 +345,7 @@ class GHMeshSimplify:
 
 
 class Mesh3D(GHMeshSimplify):
-    def __init__(self, threshold=0.1, simplification_ratio=0.5, penalty_weight=1000.0):
+    def __init__(self, threshold=0.1, simplification_ratio=0.5, penalty_weight=2000.0):
         super().__init__(threshold, simplification_ratio, penalty_weight)
         # List to store all vertices
         self.vertices = []
@@ -355,8 +355,6 @@ class Mesh3D(GHMeshSimplify):
         self.pairs = set()
         # Dictionary to store costs for valid pairs
         self.pair_costs = {}
-        # Reference to the active Blender object
-        self.active_blender_object = None
         # Dictionary to store optimal positions for vertex pairs
         self.optimal_positions = {}
         # Counter to assign unique IDs to each vertex
@@ -364,7 +362,7 @@ class Mesh3D(GHMeshSimplify):
         # Counter to assign unique IDs to each face
         self.face_id_counter = 0
         
-    def load(self, filepath):
+    def load_into_blender(self, filepath):
         """
         Load an OBJ/PLY/STL file into Blender.
         """        

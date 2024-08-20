@@ -1,5 +1,5 @@
 import argparse
-from garlandHeckbertAlgo import Mesh3D
+from garland_heckbert_algorithm import Mesh3D
 
 def main():
     parser = argparse.ArgumentParser(

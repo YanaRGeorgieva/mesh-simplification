@@ -12,6 +12,22 @@
 - Documentation explaining the mathematical concepts used.
 - Demonstration of the script running within Blender.
 
+# Module 2: Data Science
+**Project Focus:** Analyzing existing 3D mesh data with the implemented simplification algorithm
+
+**Project Description:**
+- **Use Pre-existing Datasets:** Utilize publicly available 3D mesh datasets from online sources. I will use [Thingi10K](https://ten-thousand-models.appspot.com/).
+- **Feature Extraction:** Focus on extracting relevant features from these meshes before (some are extracted by the [authors of teh dataset](https://docs.google.com/spreadsheets/d/1ZM5_1ry3Oe5uDJZxQIcFR6fjjas5rX4yjkhQ8p7Kf2Q/edit?usp=sharing)) and after applying your simplification algorithm. Features can include vertex count, triangle count, surface area, etc.
+- **Data Analysis:** Perform basic data analysis to assess the impact of the simplification algorithm on these features. Use statistical methods to quantify changes and assess algorithm effectiveness.
+- **Exploratory Data Analysis (EDA):** Create visualizations to illustrate the impact of the simplification algorithm on various types of meshes. I will use tools like Matplotlib or Seaborn for plotting.
+- **Documentation and Reporting:** Document your analysis process and findings, focusing on how the algorithm performs across different datasets and highlighting any interesting insights or trends.
+
+**Deliverables:**
+- Scripts for applying the simplification algorithm to pre-existing datasets.
+- Data analysis scripts for feature extraction and visualization.
+- Visualizations showing the impact of simplification on various mesh features.
+- A report summarizing the analysis, including visualizations and key insights.
+
 ## Requirements
 In the requirements.txt file.
 
@@ -25,6 +41,8 @@ In the requirements.txt file.
     * Then you run the script via the command palette "Blender: Run Script"
 
 3. There is a third option involving the `load_file` and `output_file` methods for files (supports whatever the [trimesh](https://trimesh.org/index.html#) library supports). In this case you can run the program in a terminal (I am sorry but for now you have to hardcode the paths to the files).
+
+4. A fourth option using the CLI scripts found in the .src folder.
 
 ## TODOs:
  - Optimize code more;
