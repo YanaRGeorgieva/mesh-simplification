@@ -28,9 +28,6 @@ python 3.11, numpy, scipy, fake-bpy-module, concurrent.futures.
 
 ## TODOs:
  - Optimize code more;
- - Preventing Mesh Inversion;
- - Preserving Boundaries;
  - More examples and better documentation;
- - Full *.obj support for read and write.
 
 <img src="images/trexFull.png" alt="Tyrannosaurus no simplification" width="45%"> <img src="images/trex90P.png" alt="Tyrannosaurus 90% simplification" width="45%">
