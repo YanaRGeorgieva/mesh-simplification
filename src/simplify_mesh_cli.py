@@ -1,5 +1,4 @@
 import argparse
-import sys
 from garlandHeckbertAlgo import Mesh3D
 
 def main():
