@@ -13,7 +13,7 @@
 - Demonstration of the script running within Blender.
 
 ## Requirements
-python 3.11, numpy, scipy, fake-bpy-module, concurrent.futures.
+In the requirements.txt file.
 
 ## How to run it
 1. You can directly put this code in Blender scripting and run it on a preselected active mesh.
