@@ -1,6 +1,6 @@
 outs:
-- md5: 3d08d9fc597377ee569cbd7497f05602.dir
-  size: 38849490871
-  nfiles: 10001
+- md5: e1baacf5f0eab46eb2fc50badeb8c72f.dir
+  size: 456775684
+  nfiles: 701
   hash: md5
   path: Thingi10K
