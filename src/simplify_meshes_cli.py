@@ -12,7 +12,7 @@ def generate_output_filename(input_file, output_dir, threshold, simplification_r
     # Preserve the original extension
     extension = os.path.splitext(input_file)[1]
     # Combine to form the output filename
-    return os.path.join(output_dir, f"{base_name}{suffix}{extension}")
+    return os.path.join(output_dir, f"{base_name}{extension}")
 
 def process_mesh_file(input_file, output_dir, threshold, simplification_ratio, penalty_weight):
     output_file = generate_output_filename(input_file, output_dir, threshold, simplification_ratio, penalty_weight)
