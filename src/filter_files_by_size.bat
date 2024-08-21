@@ -25,15 +25,15 @@ REM Loop through each file in the source folder
 for %%f in ("%SOURCE_FOLDER%\*.*") do (
     REM Get the file size in bytes
     set "FILESIZE=%%~zf"
-    
+
     REM Enable delayed expansion within the loop
     setlocal enabledelayedexpansion
-    
+
     REM Perform the file size comparison and move the file if it meets the condition
     if !FILESIZE! leq %SIZE_LIMIT% (
         move "%%f" "%DEST_FOLDER%"
     )
-    
+
     endlocal
 )
 

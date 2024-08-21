@@ -31,19 +31,19 @@ class Face:
         self.is_degenerate = False
         # Calculate initial plane equation parameters
         self.update_plane_equation()
-        
-    def calculate_normal(self) : 
+
+    def calculate_normal(self) :
         """Calculate the normal of a given face."""
         v1 = self.vertices[1].position - self.vertices[0].position
         v2 = self.vertices[2].position - self.vertices[0].position
         normal = np.cross(v1, v2)
         norm = np.linalg.norm(normal)
-    
+
         if norm == 0:
             # Handle degeneracy: Return a zero vector
             self.is_degenerate = True
             return np.zeros(3)
-    
+
         return normal / norm
 
     def update_plane_equation(self):
@@ -84,7 +84,7 @@ class GHMeshSimplify:
         self.simplification_ratio = simplification_ratio
         # Penalty weight for boundary or discontinuity edges
         self.penalty_weight = penalty_weight
-        
+
     def is_boundary_edge(self, v1, v2):
         """
         Check if the edge (v1, v2) is a boundary edge.
@@ -92,7 +92,7 @@ class GHMeshSimplify:
         """
         shared_faces = v1.faces.intersection(v2.faces)
         return len(shared_faces) == 1
-    
+
     def generate_perpendicular_plane(self, v1, v2):
         """
         Generate a perpendicular plane through the edge (v1, v2).
@@ -112,7 +112,7 @@ class GHMeshSimplify:
         d = -np.dot(perpendicular_vector, edge_midpoint)
 
         return np.array([a, b, c, d])
-    
+
     def add_boundary_quadrics(self, face):
         """
         Add quadrics for boundary/discontinuity edges to the vertices.
@@ -136,7 +136,7 @@ class GHMeshSimplify:
     def compute_vertex_Q(self, v):
         """
         Compute the initial quadric error matrix for a vertex.
-        Each vertex's quadric matrix is the sum of the outer products of the plane equations 
+        Each vertex's quadric matrix is the sum of the outer products of the plane equations
         of the faces that include this vertex. This matrix represents the error metric for the vertex.
         """
         Q = np.zeros((4, 4))  # Initialize the quadric error matrix to zero
@@ -157,7 +157,7 @@ class GHMeshSimplify:
         """
         with ThreadPoolExecutor() as executor:
             executor.map(self.compute_vertex_Q, self.vertices)
-            
+
         # After computing the initial quadrics, add boundary quadrics
         with ThreadPoolExecutor() as executor:
             executor.map(self.add_boundary_quadrics, self.faces)
@@ -233,26 +233,26 @@ class GHMeshSimplify:
         # Store the optimal position in the dictionary
         self.optimal_positions[pair] = v_optimal
         return min_cost
-    
+
     def prevent_mesh_inversion(self, v1, v2):
         """
         Check if contracting this pair of vertices would cause mesh inversion.
         """
         affected_faces = [face for face in v1.faces if v2 in face.vertices]
-                
+
         # Calculate normals before contraction
         original_normals = [face.calculate_normal() for face in affected_faces]
-        
+
         # Simulate contraction: temporarily set v1's position to the new optimal position
         original_position_v1 = v1.position.copy()
         v1.position = self.optimal_positions[(v1, v2)]
-        
+
         # Calculate normals after contraction
         new_normals = [face.calculate_normal() for face in affected_faces]
-        
+
         # Revert the position of v1
         v1.position = original_position_v1
-        
+
         # Check for any normal flips
         for original_normal, new_normal in zip(original_normals, new_normals):
             if np.dot(original_normal, new_normal) < 0:  # Dot product < 0 indicates a flip
@@ -361,13 +361,13 @@ class Mesh3D(GHMeshSimplify):
         self.vertex_id_counter = 0
         # Counter to assign unique IDs to each face
         self.face_id_counter = 0
-        
+
     def load_into_blender(self, filepath):
         """
         Load an OBJ/PLY/STL file into Blender.
-        """        
+        """
         file_extension = re.search(r'\.([a-zA-Z0-9]+)$', filepath).group(1).lower()
-        
+
         if file_extension == "obj":
             bpy.ops.wm.obj_import(filepath=filepath)
         elif file_extension == "ply":
@@ -376,7 +376,7 @@ class Mesh3D(GHMeshSimplify):
             bpy.ops.wm.stl_import(filepath=filepath)
         else:
             sys.exit(f'Error: the file type {file_extension} is not supported.')
-            
+
     def simplify_obj_from_blender(self):
         """
         Run the simplification process.
@@ -391,7 +391,7 @@ class Mesh3D(GHMeshSimplify):
         self.simplify()
         self.update_blender_mesh()
         print("Done!")
-        
+
     def simplify_obj_from_file(self, input_file, output_file):
         """
         Run the simplification process.
@@ -401,16 +401,16 @@ class Mesh3D(GHMeshSimplify):
         self.simplify()
         self.output_file(output_file)
         print("Done!")
-        
+
     def load_file(self, input_file):
         """
         Load a 3D model from a file using trimesh. Parses vertices and faces.
         """
         mesh = trimesh.load(input_file, force='mesh')
-        
+
         # Print mesh statistics
-        self.print_mesh_stats(mesh)
-        
+        # self.print_mesh_stats(mesh)
+
         # Map from vertex index to Vertex object
         vertex_map = {}
 
@@ -438,21 +438,21 @@ class Mesh3D(GHMeshSimplify):
         """
         vertices = [vertex.position for vertex in self.vertices]
         faces = []
-        
+
         for face in self.faces:
             if not face.is_degenerate:
                 face_indices = [self.vertices.index(vertex) for vertex in face.vertices]
                 faces.append(face_indices)
-        
+
         # Create a trimesh object
         mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
 
         # Print mesh statistics before saving
-        self.print_mesh_stats(mesh)
+        # self.print_mesh_stats(mesh)
 
         # Export to file
         mesh.export(output_file)
-        
+
         print("Output simplified model to:", output_file)
 
     def load_from_blender(self):
@@ -529,7 +529,7 @@ class Mesh3D(GHMeshSimplify):
         # Update the mesh data
         mesh.update()
         print("Updating of the mesh is done!")
-        
+
     def print_mesh_stats(self, mesh):
         """
         Print out various statistics of the loaded or saved mesh using trimesh.
