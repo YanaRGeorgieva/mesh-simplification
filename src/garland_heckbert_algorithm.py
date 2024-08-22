@@ -39,7 +39,7 @@ class Face:
         normal = np.cross(v1, v2)
         norm = np.linalg.norm(normal)
 
-        if norm == 0:
+        if np.isclose(norm, 0):
             # Handle degeneracy: Return a zero vector
             self.is_degenerate = True
             return np.zeros(3)
@@ -59,7 +59,7 @@ class Face:
         # Compute the length of the normal vector
         norm = np.linalg.norm(normal)
 
-        if norm == 0:
+        if np.isclose(norm, 0):
             # Mark the face as degenerate if the normal length is zero
             self.is_degenerate = True
             return
@@ -105,7 +105,24 @@ class GHMeshSimplify:
         # and ensure it is not collinear with the edge vector.
         random_vector = np.array([1, 0, 0]) if not np.allclose(edge_vector, [1, 0, 0]) else np.array([0, 1, 0])
         perpendicular_vector = np.cross(edge_vector, random_vector)
-        perpendicular_vector = perpendicular_vector / np.linalg.norm(perpendicular_vector)
+        
+        norm = np.linalg.norm(perpendicular_vector)
+        if np.isclose(norm, 0): # I forgot to handle this here as well.
+            # If the perpendicular vector's norm is close to zero, we try another "random" vector
+            random_vector = np.array([0, 1, 0]) if np.allclose(edge_vector, [0, 1, 0]) else np.array([0, 0, 1])
+            perpendicular_vector = np.cross(edge_vector, random_vector)
+            norm = np.linalg.norm(perpendicular_vector)
+
+            if np.isclose(norm, 0):
+                # As a last resort, we perturb the edge vector slightly to generate a non-zero perpendicular vector
+                perturbed_edge_vector = edge_vector + np.random.normal(0, 1e-5, size=edge_vector.shape)
+                perpendicular_vector = np.cross(perturbed_edge_vector, random_vector)
+                norm = np.linalg.norm(perpendicular_vector)
+                
+                if np.isclose(norm, 0):
+                    return None
+
+        perpendicular_vector = perpendicular_vector / norm
 
         # Plane equation: a*x + b*y + c*z + d = 0
         a, b, c = perpendicular_vector
@@ -122,6 +139,8 @@ class GHMeshSimplify:
             if self.is_boundary_edge(v1, v2):
                 # Generate a perpendicular plane for the boundary edge
                 plane = self.generate_perpendicular_plane(v1, v2)
+                if plane is None:
+                    continue # If nothing can be generated
 
                 # Convert the plane to a quadric
                 plane_quadric = np.outer(plane, plane)
@@ -342,6 +361,14 @@ class GHMeshSimplify:
             currently_removed_number_vertices += 1
 
         print(f"100.00% done with 0 vertices remaining to be removed.")
+        
+        # Clean the list of the deleted vertices
+        self.vertices = [vertex for vertex in self.vertices if vertex.id != -1]
+        # Clean the list of the deleted faces
+        faces = set()
+        for vertex in self.vertices:
+            faces.union(vertex.faces)
+        self.faces = list(faces)
 
 
 class Mesh3D(GHMeshSimplify):
@@ -513,12 +540,10 @@ class Mesh3D(GHMeshSimplify):
         # Get the mesh data of the active Blender object
         mesh = self.active_blender_object.data
 
-        # Clean the list of the deleted vertices
-        vertices_obj = [vertex for vertex in self.vertices if vertex.id != -1]
         # Get the positions of the simplified vertices
-        vertices = [vertex.position.tolist() for vertex in vertices_obj]
+        vertices = [vertex.position.tolist() for vertex in self.vertices]
         # Get the indices of the simplified faces
-        faces = [[vertices_obj.index(vertex) for vertex in face.vertices]
+        faces = [[vertices.index(vertex) for vertex in face.vertices]
                  for face in self.faces if not face.is_degenerate]
 
         # Update the mesh in Blender
