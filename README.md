@@ -48,4 +48,5 @@ In the requirements.txt file.
  - Optimize code more;
  - More examples and better documentation;
 
-<img src="images/trexFull.png" alt="Tyrannosaurus no simplification" width="45%"> <img src="images/trex90P.png" alt="Tyrannosaurus 90% simplification" width="45%">
+<img src="./data/old_data/images/trexFull.png" alt="Tyrannosaurus no simplification" width="45%"> <img src="./data/old_data/images/trex90P.png" alt="Tyrannosaurus 90% simplification" width="45%">
+
