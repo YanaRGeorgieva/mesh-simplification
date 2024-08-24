@@ -367,7 +367,7 @@ class GHMeshSimplify:
         # Clean the list of the deleted faces
         faces = set()
         for vertex in self.vertices:
-            faces.union(vertex.faces)
+            faces = faces.union(vertex.faces)
         self.faces = list(faces)
 
 
