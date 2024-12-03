@@ -1,0 +1,6 @@
+outs:
+- md5: 9a80c59cf58109254b912782aaa804ff.dir
+  size: 1068354593
+  nfiles: 15326
+  hash: md5
+  path: segmentation_data

@@ -13,11 +13,11 @@
 - Demonstration of the script running within Blender.
 
 # Module 2: Data Science
-**Project Focus:** Analyzing existing 3D mesh data with the implemented simplification algorithm
+**Project Focus:** Analysing existing 3D mesh data with the implemented simplification algorithm
 
 **Project Description:**
 - **Use Pre-existing Datasets:** Utilize publicly available 3D mesh datasets from online sources. I will use [Thingi10K](https://ten-thousand-models.appspot.com/).
-- **Feature Extraction:** Focus on extracting relevant features from these meshes before (some are extracted by the [authors of teh dataset](https://docs.google.com/spreadsheets/d/1ZM5_1ry3Oe5uDJZxQIcFR6fjjas5rX4yjkhQ8p7Kf2Q/edit?usp=sharing)) and after applying your simplification algorithm. Features can include vertex count, triangle count, surface area, etc.
+- **Feature Extraction:** Focus on extracting relevant features from these meshes before (some are extracted by the [authors of the dataset](https://docs.google.com/spreadsheets/d/1ZM5_1ry3Oe5uDJZxQIcFR6fjjas5rX4yjkhQ8p7Kf2Q/edit?usp=sharing)) and after applying your simplification algorithm. Features can include vertex count, triangle count, surface area, etc.
 - **Data Analysis:** Perform basic data analysis to assess the impact of the simplification algorithm on these features. Use statistical methods to quantify changes and assess algorithm effectiveness.
 - **Exploratory Data Analysis (EDA):** Create visualizations to illustrate the impact of the simplification algorithm on various types of meshes. I will use tools like Matplotlib or Seaborn for plotting.
 - **Documentation and Reporting:** Document your analysis process and findings, focusing on how the algorithm performs across different datasets and highlighting any interesting insights or trends.
@@ -27,6 +27,68 @@
 - Data analysis scripts for feature extraction and visualization.
 - Visualizations showing the impact of simplification on various mesh features.
 - A report summarizing the analysis, including visualizations and key insights.
+
+# **Module 3: Machine Learning**
+**Project Focus:** Enhancing mesh simplification through machine learning-driven segmentation and detail preservation.
+
+**Project Description:**
+- **Objective:** 
+  - To develop a machine learning-driven approach for 3D mesh segmentation that prioritizes high-detail clusters, improving the performance of mesh simplification algorithms.
+
+- **Key Components:**
+  1. **Similarity Matrix Construction:**
+     - Leverage concepts from the paper "[3D Mesh Segmentation Based on Multiclass Spectral Graph Partition](https://www.researchgate.net/publication/261428678_3D_Mesh_Segmentation_Based_on_Multiclass_Spectral_Graph_Partition)" to compute a similarity matrix between mesh faces based on features such as:
+       - Geodesic distances.
+       - Shape Diameter Function (SDF).
+       - Dihedral angles (concavities).
+     - The similarity matrix forms the input to clustering algorithms.
+
+  2. **Clustering for Mesh Segmentation:**
+     - Experiment with scikit-learn clustering algorithms that support precomputed affinity matrices, including:
+       - **Spectral Clustering**
+       - **DBSCAN**
+       - **Hierarchical Clustering**
+       - other
+     - Use pre-existing benchmarks "[A Benchmark for 3D Mesh Segmentation](https://segeval.cs.princeton.edu/)" for mesh segmentation to evaluate and optimize the clustering algorithms.
+     - Utilize **Hyperopt** for hyperparameter tuning to improve clustering performance against benchmarks. Use **MLflow** to record some sessions.
+     - Choose the best performing?
+
+  3. **Identifying High-Detail Clusters:**
+     - Implement heuristics to identify clusters requiring higher preservation during mesh simplification. Possible heuristics include:
+       - Higher curvature regions.
+       - Higher vertex density.
+       - SDF and dihedral angle analysis.
+       
+  4. **Integration with Simplification:**
+     - Modify the mesh simplification algorithm to penalize simplifications in high-detail clusters identified through segmentation.
+     - Test whether preserving high-detail clusters improves simplification results by:
+       - Visual comparison.
+       - Quantitative metrics (e.g., vertex count, triangle count, and fidelity metrics like Hausdorff Distance).
+
+  5. **Benchmark and Evaluation:**
+     - Compare the results of segmentation-enhanced simplification against:
+       - Baseline segmentation.
+       - Simplification without segmentation.
+     - Use datasets such as **Thingi10K** for evaluation.
+
+**Deliverables:**
+1. **Segmentation Pipeline:**
+   - Implementation of similarity matrix construction and clustering algorithms.
+   - Code for benchmarking segmentation performance against existing benchmarks.
+
+2. **Heuristic for Detail Preservation:**
+   - Heuristics to identify high-detail clusters based on segmentation.
+
+3. **Enhanced Simplification Algorithm:**
+   - Modified simplification algorithm that integrates segmentation results.
+
+4. **Evaluation Metrics and Analysis:**
+   - Visualizations comparing segmentation and simplification results.
+
+5. **Final Report:**
+   - A detailed report documenting:
+     - Methodology for segmentation and simplification enhancement.
+     - Insights from hyperparameter tuning of clustering algorithms.
 
 ## Requirements
 In the requirements.txt file.
