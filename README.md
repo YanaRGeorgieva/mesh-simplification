@@ -47,7 +47,6 @@
      - Experiment with scikit-learn clustering algorithms that support precomputed affinity matrices, including:
        - **Spectral Clustering**
        - **DBSCAN**
-       - **Hierarchical Clustering**
        - other
      - Use pre-existing benchmarks "[A Benchmark for 3D Mesh Segmentation](https://segeval.cs.princeton.edu/)" for mesh segmentation to evaluate and optimize the clustering algorithms.
      - Utilize **Hyperopt** for hyperparameter tuning to improve clustering performance against benchmarks. Use **MLflow** to record some sessions.

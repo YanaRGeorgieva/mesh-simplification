@@ -2,7 +2,7 @@ import os
 import sys
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from garland_heckbert_algorithm import Mesh3D
+from garland_heckbert_algorithm import SimplifyMesh3D
 
 def generate_output_filename(input_file, output_dir, threshold, simplification_ratio, penalty_weight):
     # Extract the base filename without extension
@@ -17,7 +17,7 @@ def generate_output_filename(input_file, output_dir, threshold, simplification_r
 def process_mesh_file(input_file, output_dir, threshold, simplification_ratio, penalty_weight):
     output_file = generate_output_filename(input_file, output_dir, threshold, simplification_ratio, penalty_weight)
 
-    mesh_simplifier = Mesh3D(threshold=threshold, simplification_ratio=simplification_ratio, penalty_weight=penalty_weight)
+    mesh_simplifier = SimplifyMesh3D(threshold=threshold, simplification_ratio=simplification_ratio, penalty_weight=penalty_weight)
 
     mesh_simplifier.simplify_obj_from_file(input_file, output_file)
 

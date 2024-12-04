@@ -371,7 +371,7 @@ class GHMeshSimplify:
         self.faces = list(faces)
 
 
-class Mesh3D(GHMeshSimplify):
+class SimplifyMesh3D(GHMeshSimplify):
     def __init__(self, threshold=0.1, simplification_ratio=0.5, penalty_weight=2000.0):
         super().__init__(threshold, simplification_ratio, penalty_weight)
         # List to store all vertices
@@ -574,7 +574,7 @@ class Mesh3D(GHMeshSimplify):
         print(f"Bounding box extents: {mesh.extents}")
 
 # Example usage:
-# meshy = Mesh3D(0.1, 0.5)
+# meshy = SimplifyMesh3D(0.1, 0.5)
 # simplify.simplify_obj_from_blender()
 # meshy.simplify_obj_from_file("...\teapot.obj", "...\sim_teapot.obj")
 

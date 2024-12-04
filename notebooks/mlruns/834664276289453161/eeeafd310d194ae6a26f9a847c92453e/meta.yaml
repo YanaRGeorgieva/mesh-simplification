@@ -1,0 +1,16 @@
+artifact_uri: file:///d:/AI/Math-Concepts-For-Devs/00.Project/mesh-simplification/notebooks/mlruns/834664276289453161/eeeafd310d194ae6a26f9a847c92453e/artifacts
+deleted_time: 1733245925502
+end_time: 1733242892337
+entry_point_name: ''
+experiment_id: '834664276289453161'
+lifecycle_stage: deleted
+run_id: eeeafd310d194ae6a26f9a847c92453e
+run_name: Training w.r.t. first benchmark for respective mesh
+run_uuid: eeeafd310d194ae6a26f9a847c92453e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1733242841968
+status: 4
+tags: []
+user_id: alexk

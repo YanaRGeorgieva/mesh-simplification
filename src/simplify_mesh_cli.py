@@ -1,5 +1,5 @@
 import argparse
-from garland_heckbert_algorithm import Mesh3D
+from garland_heckbert_algorithm import SimplifyMesh3D
 
 def main():
     parser = argparse.ArgumentParser(
@@ -46,7 +46,7 @@ def main():
     args = parser.parse_args()
 
     # Create the mesh simplifier with provided arguments
-    meshy = Mesh3D(threshold=args.threshold, simplification_ratio=args.simplification_ratio, penalty_weight=args.penalty_weight)
+    meshy = SimplifyMesh3D(threshold=args.threshold, simplification_ratio=args.simplification_ratio, penalty_weight=args.penalty_weight)
 
     # Load, simplify, and save the mesh
     meshy.simplify_obj_from_file(args.input_file, args.output_file)
