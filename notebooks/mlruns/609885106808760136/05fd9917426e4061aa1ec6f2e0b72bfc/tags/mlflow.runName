@@ -1,0 +1,1 @@
+Spectral Clustering tuning with ${'assign_labels': 'cluster_qr', 'eigen_solver': 'lobpcg', 'geodesic_neighbourhood': 'approximate', 'human_segmentation': {'cluster_labels': array([0, 0, 0, ..., 0, 0, 0]), 'n_clusters': np.int64(4)}, 'multiplier': 0.008152783377432592}

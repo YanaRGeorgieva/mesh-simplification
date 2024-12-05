@@ -1,0 +1,1 @@
+Spectral Clustering tuning with ${'assign_labels': 'discretize', 'eigen_solver': 'amg', 'geodesic_neighbourhood': 'approximate', 'human_segmentation': {'cluster_labels': array([4, 4, 0, ..., 0, 0, 0]), 'n_clusters': np.int64(8)}, 'multiplier': 0.006042863386099735}

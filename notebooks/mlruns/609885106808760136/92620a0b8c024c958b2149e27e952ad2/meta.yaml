@@ -1,0 +1,17 @@
+artifact_uri: file:///d:/AI/Math-Concepts-For-Devs/00.Project/mesh-simplification/notebooks/mlruns/609885106808760136/92620a0b8c024c958b2149e27e952ad2/artifacts
+deleted_time: 1733320286355
+end_time: 1733318813898
+entry_point_name: ''
+experiment_id: '609885106808760136'
+lifecycle_stage: deleted
+run_id: 92620a0b8c024c958b2149e27e952ad2
+run_name: Spectral Clustering tuning with multiplier=$0.019595537885711535; eigen_solver=$lobpcg;
+  assign_labels=$discretize
+run_uuid: 92620a0b8c024c958b2149e27e952ad2
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1733318813875
+status: 4
+tags: []
+user_id: alexk

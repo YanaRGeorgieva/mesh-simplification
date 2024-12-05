@@ -84,6 +84,20 @@ class GHMeshSimplify:
         self.simplification_ratio = simplification_ratio
         # Penalty weight for boundary or discontinuity edges
         self.penalty_weight = penalty_weight
+        
+    def mark_high_detail_vertices(self, cluster_labels, high_detail_clusters, penalty_factor=1.5):
+        """
+        Mark vertices that belong to high-detail clusters and apply a penalty.
+        """
+        # Mark faces that belong to high-detail clusters
+        high_detail_faces = set(np.where(np.isin(cluster_labels, list(high_detail_clusters)))[0])
+
+        # Mark vertices connected to these faces
+        for face in self.faces:
+            if face.id in high_detail_faces:
+                for vertex in face.vertices:
+                    vertex.is_high_detail = True
+                    vertex.penalty_factor = penalty_factor
 
     def is_boundary_edge(self, v1, v2):
         """
@@ -167,6 +181,9 @@ class GHMeshSimplify:
                 p = p.reshape(1, len(p))
                 # Add the outer product of p to the quadric matrix
                 Q += np.matmul(p.T, p)
+        # Apply penalty for high-detail vertices
+        if getattr(v, "is_high_detail", False):
+            Q *= v.penalty_factor
         # Assign the computed quadric matrix to the vertex
         v.Q = Q
 
@@ -191,7 +208,7 @@ class GHMeshSimplify:
             for i, v1 in enumerate(face.vertices):
                 v2 = face.vertices[(i + 1) % len(face.vertices)]
                 self.pairs.add(
-                    tuple(sorted((v1, v2), key=lambda vertex: vertex.id)))
+                    (v1, v2) if v1.id < v2.id else (v2, v1))
 
         if self.threshold > 0:
             # Using a KD-tree to optimize the selection of points which satisfy the threshold distance
@@ -205,8 +222,7 @@ class GHMeshSimplify:
                 for j in indices:
                     if i < j:
                         v2 = self.vertices[j]
-                        if v1.id < v2.id:
-                            valid_pairs.add((v1, v2))
+                        valid_pairs.add((v1, v2) if v1.id < v2.id else (v2, v1))
                 return valid_pairs
 
             with ThreadPoolExecutor() as executor:
@@ -339,8 +355,8 @@ class GHMeshSimplify:
                     for i, v in enumerate(face.vertices):
                         v3 = face.vertices[(i + 1) % num]
                         if v != v3 and (v == v1 or v3 == v1):
-                            new_pairs.add(
-                                tuple(sorted((v, v3), key=lambda vertex: vertex.id)))
+                            new_pairs.add((v, v3) if v.id < v3.id else (v3, v)
+)
 
             # Recompute the quadric error matrix for the updated vertex v1
             self.compute_vertex_Q(v1)
@@ -374,6 +390,9 @@ class GHMeshSimplify:
 class SimplifyMesh3D(GHMeshSimplify):
     def __init__(self, threshold=0.1, simplification_ratio=0.5, penalty_weight=2000.0):
         super().__init__(threshold, simplification_ratio, penalty_weight)
+        self.clean()
+        
+    def clean(self):
         # List to store all vertices
         self.vertices = []
         # List to store all faces
@@ -417,6 +436,7 @@ class SimplifyMesh3D(GHMeshSimplify):
         self.initial_compute_error_quadrics()
         self.simplify()
         self.update_blender_mesh()
+        self.clean()
         print("Done!")
 
     def simplify_obj_from_file(self, input_file, output_file):
@@ -427,7 +447,33 @@ class SimplifyMesh3D(GHMeshSimplify):
         self.initial_compute_error_quadrics()
         self.simplify()
         self.output_file(output_file)
+        self.clean()
         print("Done!")
+        
+    def simplify_obj(self, input_mesh):
+        """
+        Run the simplification process.
+        """
+        self.load_mesh(input_mesh)
+        self.initial_compute_error_quadrics()
+        self.simplify()
+        print("Done!")
+        output_mesh = self.output_mesh()
+        self.clean()
+        return output_mesh
+    
+    def simplify_obj_penalize_clusters(self, input_mesh, cluster_labels_faces, detailed_clusters, penalty = 1.5):
+        """
+        Run the simplification process.
+        """
+        self.load_mesh(input_mesh)
+        self.mark_high_detail_vertices(cluster_labels_faces, detailed_clusters, penalty)
+        self.initial_compute_error_quadrics()
+        self.simplify()
+        print("Done!")
+        output_mesh = self.output_mesh()
+        self.clean()
+        return output_mesh
 
     def load_file(self, input_file):
         """
@@ -458,6 +504,33 @@ class SimplifyMesh3D(GHMeshSimplify):
 
         print("Loaded 3D model from:", input_file)
         del mesh
+        
+    def load_mesh(self, input_mesh):
+        """
+        Parses a trimesh model vertices and faces.
+        """
+        # Print mesh statistics
+        # self.print_mesh_stats(mesh)
+
+        # Map from vertex index to Vertex object
+        vertex_map = {}
+
+        for i, vertex in enumerate(input_mesh.vertices):
+            position = vertex
+            vertex_obj = Vertex(position, self.vertex_id_counter)
+            self.vertices.append(vertex_obj)
+            vertex_map[i] = vertex_obj
+            self.vertex_id_counter += 1
+
+        for i, face_indices in enumerate(input_mesh.faces):
+            face_vertices = [vertex_map[idx] for idx in face_indices]
+            face = Face(face_vertices, self.face_id_counter)
+            self.face_id_counter += 1
+            self.faces.append(face)
+            for vertex in face_vertices:
+                vertex.faces.add(face)
+
+        print("Loaded 3D model.")
 
     def output_file(self, output_file):
         """
@@ -481,6 +554,27 @@ class SimplifyMesh3D(GHMeshSimplify):
         mesh.export(output_file)
 
         print("Output simplified model to:", output_file)
+        
+    def output_mesh(self):
+        """
+        Output the simplified mesh.
+        """
+        vertices = [vertex.position for vertex in self.vertices]
+        faces = []
+
+        for face in self.faces:
+            if not face.is_degenerate:
+                face_indices = [self.vertices.index(vertex) for vertex in face.vertices]
+                faces.append(face_indices)
+
+        # Create a trimesh object
+        mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
+
+        # Print mesh statistics before saving
+        # self.print_mesh_stats(mesh)
+
+        print("Output simplified model.")
+        return mesh
 
     def load_from_blender(self):
         """

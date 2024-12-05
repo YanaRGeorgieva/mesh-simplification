@@ -1,0 +1,1 @@
+Spectral Clustering tuning with ${'assign_labels': 'kmeans', 'eigen_solver': 'amg', 'geodesic_neighbourhood': 'approximate', 'human_segmentation': {'cluster_labels': array([0, 0, 0, ..., 4, 4, 4]), 'n_clusters': np.int64(5), 'segmentation_name': './../data/segmentation_data/seg/Benchmark/125\\125_5.seg'}, 'multiplier': 0.0045}

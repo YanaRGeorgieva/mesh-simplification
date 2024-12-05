@@ -1,0 +1,19 @@
+artifact_uri: file:///d:/AI/Math-Concepts-For-Devs/00.Project/mesh-simplification/notebooks/mlruns/641831432287157435/13176d55c73444f5baaba5d3d9dc1ba7/artifacts
+end_time: 1733347989318
+entry_point_name: ''
+experiment_id: '641831432287157435'
+lifecycle_stage: active
+run_id: 13176d55c73444f5baaba5d3d9dc1ba7
+run_name: 'Spectral Clustering tuning with ${''assign_labels'': ''cluster_qr'', ''eigen_solver'':
+  ''amg'', ''geodesic_neighbourhood'': ''exact'', ''human_segmentation'': {''cluster_labels'':
+  array([4, 4, 0, ..., 0, 0, 0]), ''n_clusters'': np.int64(8), ''segmentation_name'':
+  ''./../data/segmentation_data/seg/Benchmark/125\\125_11.seg''}, ''multiplier'':
+  0.05}'
+run_uuid: 13176d55c73444f5baaba5d3d9dc1ba7
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1733347524420
+status: 3
+tags: []
+user_id: alexk
